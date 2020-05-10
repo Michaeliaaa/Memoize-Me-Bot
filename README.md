@@ -1,2 +1,2 @@
 # Memoize-Me-Bot
-Orbital (a.k.a., CP2106: Independent Software Development Project)
+Memoize Me Bot is a self-initiated project started by Michaelia and Caitlin for Orbital (a.k.a., CP2106: Independent Software Development Project). It serves as a practical study bot that can be used by many (students, teaching assistants and lecturers) to test understanding of important concepts that are being taught. It can be used as a quiz or a flashcard. The project is still on-going so do keep a lookout!
