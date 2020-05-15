@@ -1,7 +1,13 @@
-from telegram.ext import Updater, InlineQueryHandler, CommandHandler
+import logging
+from telegram.ext import Updater, InlineQueryHandler, CommandHandler,  CallbackQueryHandler
 from telegram.ext.dispatcher import run_async
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import requests
 import re
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def start(update, context):
@@ -18,9 +24,29 @@ def delete(update, context):
     
 def edit(update, context):
     update.message.reply_text('Choose the deck you’d like to edit! You can choose to delete or add new questions to your deck!')
-    
+    edit_buttons(update, context)
+
+def edit_buttons(update, context):
+    deck_to_edit = update.message.text
+    keyboard = [[InlineKeyboardButton("Add card", callback_data='add card'),
+                InlineKeyboardButton("Delete card", callback_data='delete card')],
+                [InlineKeyboardButton("Edit card", callback_data='edit card'), 
+                InlineKeyboardButton("Remove deck", callback_data='remove deck')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text('Found ya! Here is your ' + deck_to_edit + '! What do you want to do with the deck?', reply_markup=reply_markup)
+
 def test(update, context):
     update.message.reply_text('Choose the flashcard deck you’d like to be tested on!')
+
+def button(update, context):
+    query = update.callback_query
+    query.answer()
+    query.edit_message_text(text="You chose to {}!".format(query.data))
+
+def error(update, context):
+    """Log Errors caused by Updates."""
+
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 def main():
     updater = Updater('1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM', use_context = True)
@@ -31,6 +57,9 @@ def main():
     dp.add_handler(CommandHandler('delete', delete))
     dp.add_handler(CommandHandler('edit', edit))
     dp.add_handler(CommandHandler('test', test))
+    #dp.add_handler(CommandHandler('trying', trying))
+    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+    updater.dispatcher.add_error_handler(error)
     updater.start_polling()
     updater.idle()
 
