@@ -4,6 +4,11 @@ from telegram.ext.dispatcher import run_async
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import requests
 import re
+import os
+PORT = int(os.environ.get('PORT', 5000))
+
+
+TOKEN = '1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM'
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -49,6 +54,7 @@ def error(update, context):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 def main():
+    #1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM
     updater = Updater('1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM', use_context = True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('start', start))
@@ -60,7 +66,11 @@ def main():
     #dp.add_handler(CommandHandler('trying', trying))
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
     updater.dispatcher.add_error_handler(error)
-    updater.start_polling()
+    #updater.start_polling()
+    updater.start_webhook(listen="0.0.0.0",
+                          port=int(PORT),
+                          url_path=TOKEN)
+    updater.bot.setWebhook('https://memoize-me-telegram-bot.herokuapp.com/' + TOKEN)
     updater.idle()
 
 if __name__ == '__main__':
