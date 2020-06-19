@@ -496,14 +496,20 @@ def testing(update, context):
                                       database = "dfhns0og19dacd")
         cursor = connection.cursor()
 
-        if (getText(update) == "/cancel"):
+        if (getText(update) == "Done"):
             #Delete record
-            postgres_delete_query = """DELETE FROM checking WHERE user_id = %s"""
+            postgres_delete_query = """ DELETE FROM checking WHERE user_id = %s"""
             record_to_delete = (getID(update),)
             cursor.execute(postgres_delete_query, record_to_delete)
             connection.commit()
-            postgresSQL_delete_query = """DROP TABLE copy"""
-            cursor.execute(postgresSQL_delete_query)
+            done(update, context)
+            return ConversationHandler.END
+        elif (getText(update) == "/cancel"):
+            #Delete record
+            postgres_delete_query = """ DELETE FROM checking WHERE user_id = %s"""
+            record_to_delete = (getID(update),)
+            cursor.execute(postgres_delete_query, record_to_delete)
+            connection.commit()
             cancel(update, context)
             return CHOOSING
 
