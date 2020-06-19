@@ -506,6 +506,16 @@ def testing(update, context):
             cursor.execute(postgresSQL_delete_query)
             cancel(update, context)
             return CHOOSING
+          elif (getText(update) == "/done"):
+            #Delete record
+            postgres_delete_query = """DELETE FROM checking WHERE user_id = %s"""
+            record_to_delete = (getID(update),)
+            cursor.execute(postgres_delete_query, record_to_delete)
+            connection.commit()
+            postgresSQL_delete_query = """DROP TABLE copy"""
+            cursor.execute(postgresSQL_delete_query)
+            cancel(update, context)
+            return CHOOSING
 
         #Find the deck_id
         postgres_deck_query = "SELECT deck_id FROM checking WHERE user_id = %s"
