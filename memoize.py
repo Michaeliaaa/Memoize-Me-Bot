@@ -579,6 +579,10 @@ def done(update, context):
     update.message.reply_text("That's all for today! Type /start to start again!")
     return ConversationHandler.END
 
+# Generate a random quote
+def quotes(update, context):
+    update.message.reply_text(get_random_quote())
+  
 # Log Errors caused by Updates.
 def error(update, context):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
@@ -587,6 +591,7 @@ def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CommandHandler("quotes", quotes))
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
