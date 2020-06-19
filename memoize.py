@@ -6,6 +6,7 @@ import requests
 import re
 import psycopg2
 from psycopg2 import Error
+from quotes import get_random_quote
 from random import randint
 import logging
 import os
@@ -477,7 +478,6 @@ def ask_qns(update, context, deck_id):
                 # Delete card_id that is already tested from copy 
                 postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
                 cursor.execute(postgres_delete_query, card_to_select)
-
         except (Exception, psycopg2.Error) as error :
             print ("Error while fetching data from PostgreSQL", error)
         finally:
@@ -485,6 +485,7 @@ def ask_qns(update, context, deck_id):
                 cursor.close()
                 connection.close()
                 # print("PostgreSQL connection is closed")
+            return CHOOSING
 
 def testing(update, context):
     try:
