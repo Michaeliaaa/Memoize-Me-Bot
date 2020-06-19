@@ -506,7 +506,7 @@ def testing(update, context):
             cursor.execute(postgresSQL_delete_query)
             cancel(update, context)
             return CHOOSING
-          elif (getText(update) == "/done"):
+        elif (getText(update) == "/done"):
             #Delete record
             postgres_delete_query = """DELETE FROM checking WHERE user_id = %s"""
             record_to_delete = (getID(update),)
