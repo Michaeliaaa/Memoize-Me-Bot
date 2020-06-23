@@ -58,13 +58,13 @@ try:
     print("Table answers created successfully in PostgreSQL ")
 
 
-    create_checking_table_query = '''CREATE TABLE IF NOT EXISTS checking
+    create_check_ans_table_query = '''CREATE TABLE IF NOT EXISTS check_ans
           (user_id INT PRIMARY KEY,
           card_id INT NOT NULL,
           deck_id INT); '''
-    cursor.execute(create_checking_table_query)
+    cursor.execute(create_check_ans_table_query)
     connection.commit()
-    print("Table checking created successfully in PostgreSQL ")
+    print("Table check_ans created successfully in PostgreSQL ")
 
 except (Exception, psycopg2.DatabaseError) as error :
     print ("Error while creating PostgreSQL table", error)
