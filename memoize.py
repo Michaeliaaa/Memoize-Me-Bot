@@ -1738,7 +1738,7 @@ def help(update, context):
     helpMessage += "Second page:\n"
     helpMessage += "SHARE 📩 - share your created decks or recieve shared decks from others\n"
     helpMessage += "RENAME ✏️ - rename a selected deck\n"
-    helpMessage += "SET TEST TIMER ⏱️ - set or unset a timer\n"
+    helpMessage += "SET TIMER ⏱️ - set or unset a timer\n"
     helpMessage += "MOTIVATIONAL QUOTES 😉 - get a random motivational quote\n"
     helpMessage += "DAILY REMINDER 🔔 - set a daily reminder for yourself at a selected time\n"
     helpMessage += "POMODORO TIMER 🍅 - productivity timer to to help you focus on work (25 mins)\n"
@@ -1962,8 +1962,11 @@ def set_timer(update, context):
             context.chat_data['job'] = new_job
             update.message.reply_text('Timer set successfully!')
             update.message.reply_text("Duration of timer: {} minutes".format(duration))
+            return CHOOSING
         except (IndexError, ValueError):
             update.message.reply_text('Usage: <Integer greater than 0>')
+            return CHOOSING
+            
 
 def unset(update, context):
     """Remove the job if the user changed their mind."""
