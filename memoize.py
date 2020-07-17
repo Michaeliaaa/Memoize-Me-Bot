@@ -16,7 +16,7 @@ import datetime
 import pytz
 
 PORT = int(os.environ.get('PORT', 5000))
-TOKEN = "1104454387:AAHpZk9Xp4UaxjvfON0sS6ti_JRBTLOrjuQ"
+TOKEN = "1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM"
 URL = "https://api.telegram.org/bot{}/".format(TOKEN)
 
 random_no = 34987203
