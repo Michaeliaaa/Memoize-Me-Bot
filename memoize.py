@@ -16,7 +16,7 @@ import datetime
 from array import array
 
 PORT = int(os.environ.get('PORT', 5000))
-TOKEN = "1104454387:AAHpZk9Xp4UaxjvfON0sS6ti_JRBTLOrjuQ"
+TOKEN = "1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM"
 URL = "https://api.telegram.org/bot{}/".format(TOKEN)
 
 random_no = 34987203
@@ -2276,11 +2276,11 @@ def main():
     )
     dp.add_handler(conv_handler_normal)
     dp.add_error_handler(error)
-    updater.start_polling()
-    # updater.start_webhook(listen="0.0.0.0",
-    #                       port=int(PORT),
-    #                       url_path=TOKEN)
-    # updater.bot.setWebhook('https://memoize-me-telegram-bot.herokuapp.com/' + TOKEN)
+    # updater.start_polling()
+    updater.start_webhook(listen="0.0.0.0",
+                          port=int(PORT),
+                          url_path=TOKEN)
+    updater.bot.setWebhook('https://memoize-me-telegram-bot.herokuapp.com/' + TOKEN)
     updater.idle()
 
 if __name__ == '__main__':
