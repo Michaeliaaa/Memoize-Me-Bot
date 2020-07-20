@@ -13,10 +13,10 @@ import os
 import math
 import time
 import datetime
-import pytz
+from array import array
 
 PORT = int(os.environ.get('PORT', 5000))
-TOKEN = "1257761341:AAEL0eO8n4kgvSy3CfJgAAg4EkaME4JQ5sM"
+TOKEN = "1104454387:AAHpZk9Xp4UaxjvfON0sS6ti_JRBTLOrjuQ"
 URL = "https://api.telegram.org/bot{}/".format(TOKEN)
 
 random_no = 34987203
@@ -42,11 +42,11 @@ markup_2 = ReplyKeyboardMarkup(reply_keyboard_2)
 
 # Connect to db
 def connect_db():
-        connection = psycopg2.connect(user = "jhfdzctgeytrkt",
-                            password = "6f0913d556bf6eee840e0e2ba8b4c0b3ef0331f6855852008be07eeb840cdb6f",
-                            host = "ec2-35-173-94-156.compute-1.amazonaws.com",
+        connection = psycopg2.connect(user = "ypuzvnpikuyzec",
+                            password = "b508ea454fb3ea5f4831560152799b203714bc742bb8c4b000fac6b91ef28cec",
+                            host = "ec2-35-171-31-33.compute-1.amazonaws.com",
                             port = "5432",
-                            database = "dbpduk6f0fbp8q")
+                            database = "dfhns0og19dacd")
         return connection
 
 """ Main Commands """ 
@@ -58,8 +58,8 @@ def start(update, context):
     try:
         connection = connect_db()
         cursor = connection.cursor()
-        postgres_insert_query = """INSERT INTO users (user_id) VALUES (%s) """
-        user_to_insert = (getID(update),)
+        postgres_insert_query = """INSERT INTO users (user_id, users_questions, test_done) VALUES (%s, %s, False) """
+        user_to_insert = (getID(update), [],)
         cursor.execute(postgres_insert_query, user_to_insert)
         connection.commit()
         count = cursor.rowcount
@@ -200,10 +200,10 @@ def view_qna(update, context):
             index = 1
             for idx, i in enumerate(c):
                 if idx % 2 == 0:
-                    print(lst_text)
+                    # print(lst_text)
                     #is_text = lst_text[(int(i) - 1)]
                     #print(i)
-                    print(lst_text[index-1])
+                    # print(lst_text[index-1])
                     if(lst_text[index - 1]):
                         update.message.reply_text(("Question {}: \n\n" + i).format(str(index)))
                         index = index + 1
@@ -360,9 +360,18 @@ def get_photo(update, context: CallbackContext):
                 ID = 0
             global qns_count
             qns_count = ID
+
+            # Update score
+            postgres_score_query = """SELECT max(card_id) FROM cards INNER JOIN decks ON cards.deck_id = decks.deck_id WHERE decks.user_id = %s"""
+            score_to_insert = (getID(update),)
+            cursor.execute(postgres_score_query, score_to_insert)
+            card_id = cursor.fetchone()
+            print(card_id)
+
+
             # Add question
-            postgres_insert_query = """INSERT INTO questions (qns_id, card_id, qns_info, is_text) VALUES (DEFAULT, DEFAULT, %s, False)"""
-            question_to_insert = (url,)
+            postgres_insert_query = """INSERT INTO questions (qns_id, card_id, qns_info, is_text) VALUES (%s, %s, %s, False)"""
+            question_to_insert = (card_id, card_id, url,)
             cursor.execute(postgres_insert_query, question_to_insert)
             connection.commit()
             count = cursor.rowcount
@@ -394,9 +403,17 @@ def add_qns(update, context):
                 ID = 0
             global qns_count
             qns_count = ID
+
+            # Update score
+            postgres_score_query = """SELECT max(card_id) FROM cards INNER JOIN decks ON cards.deck_id = decks.deck_id WHERE decks.user_id = %s"""
+            score_to_insert = (getID(update),)
+            cursor.execute(postgres_score_query, score_to_insert)
+            card_id = cursor.fetchone()
+            print(card_id)
+
             # Add question
-            postgres_insert_query = """INSERT INTO questions (qns_id, card_id, qns_info, is_text) VALUES (DEFAULT, DEFAULT, %s, True)"""
-            question_to_insert = (getText(update),)
+            postgres_insert_query = """INSERT INTO questions (qns_id, card_id, qns_info, is_text) VALUES (%s, %s, %s, True)"""
+            question_to_insert = (card_id, card_id, getText(update),)
             cursor.execute(postgres_insert_query, question_to_insert)
             connection.commit()
             count = cursor.rowcount
@@ -426,8 +443,16 @@ def add_ans(update, context):
             ID = cursor.fetchone()
             if ID is None:
                 ID = 0
-            postgres_insert_query = """INSERT INTO answers (ans_id, card_id, ans_info) VALUES (DEFAULT, DEFAULT, %s)"""
-            answer_to_insert = (getText(update),)
+
+            # Update score
+            postgres_score_query = """SELECT max(card_id) FROM cards INNER JOIN decks ON cards.deck_id = decks.deck_id WHERE decks.user_id = %s"""
+            score_to_insert = (getID(update),)
+            cursor.execute(postgres_score_query, score_to_insert)
+            card_id = cursor.fetchone()
+            print(card_id)
+
+            postgres_insert_query = """INSERT INTO answers (ans_id, card_id, ans_info) VALUES (%s, %s, %s)"""
+            answer_to_insert = (card_id, card_id, getText(update),)
             cursor.execute(postgres_insert_query, answer_to_insert)
             connection.commit()
             count = cursor.rowcount
@@ -636,16 +661,7 @@ def delete_deck(update, context):
             if(connection):
                 print("Failed to delete deck from decks table", error)
         finally:
-            postgres_index_check_query = """SELECT to_regclass('index');"""
-            cursor.execute(postgres_index_check_query)
-            check = cursor.fetchone()
             # closing database connection.
-            print("Index table existence: " + str(check[0] == "index"))
-            if ((check[0] == 'index') == True):
-                postgresSQL_delete_query = """DROP TABLE IF EXISTS index"""
-                cursor.execute(postgresSQL_delete_query)
-                connection.commit()
-            print("Table index deleted successfully in PostgreSQL ")
             if(connection):
                 cursor.close()
                 connection.close()
@@ -659,6 +675,7 @@ def show_qns(update, context):
         try:
             connection = connect_db()
             cursor = connection.cursor()
+            # Retrieve deck_id
             postgres_deck_id_query = """SELECT deck_id FROM decks WHERE deck_name = (%s) AND user_id = (%s)"""
             deck_name_and_id = (getText(update), getID(update),)
             cursor.execute(postgres_deck_id_query, deck_name_and_id)
@@ -672,13 +689,6 @@ def show_qns(update, context):
             cursor.execute(postgres_count_qns_query, deck_name_and_id)
             count = cursor.fetchone()
             print("Number of qns in the deck: " + str(count[0]))
-            # Create index table for numbering
-            create_index_table_query = '''CREATE TABLE IF NOT EXISTS index
-                    (qns_index INT PRIMARY KEY,
-                    qns_id INT NOT NULL); '''
-            cursor.execute(create_index_table_query)
-            connection.commit()
-            print("Table index created successfully in PostgreSQL")
             deck_id_to_insert = (DECK_ID)
             # Retrieve qns_id from deck_id
             postgres_qns_id_query = """SELECT qns_id FROM cards WHERE cards.deck_id = %s"""
@@ -686,26 +696,21 @@ def show_qns(update, context):
             ids = cursor.fetchall()
             print("Qns IDs: " + str(ids))
             # Retrieve qns_info from deck_id
-            postgres_view_qns_query = """SELECT qns_info, is_text FROM questions INNER JOIN cards ON questions.card_id = cards.card_id WHERE cards.deck_id = %s"""
+            postgres_view_qns_query = """SELECT qns_info, is_text, questions.card_id FROM questions INNER JOIN cards ON questions.card_id = cards.card_id WHERE cards.deck_id = %s"""
             cursor.execute(postgres_view_qns_query, deck_id_to_insert)
             questions = cursor.fetchall()
             lst_of_qns = list(q[0] for q in questions)
             lst_text = list(q[1] for q in questions)
+            lst_of_cardid = list(q[2] for q in questions)
             if len(lst_of_qns) == 0:
                 update.message.reply_text("There aren't any flashcards in this deck.\n\nAdd flashcards by clicking ADD!", reply_markup=markup)
                 return CHOOSING
             else:
-                # Insert qns_index and qns_id into the index table
-                index = 1
-                for id in ids:
-                    print("Qns ID: " + str(id))
-                    postgres_insert_query = """INSERT INTO index (qns_index, qns_id) VALUES (%s, %s)"""
-                    record_to_insert = (index, id[0],)
-                    cursor.execute(postgres_insert_query, record_to_insert)
-                    connection.commit()
-                    print("index {} created successfully".format(index))
-                    index = index + 1
-                    print("All indexes are inserted successfully")
+                postgres_update_query = """UPDATE users SET users_questions = (%s) WHERE user_id = (%s)"""
+                list_to_insert = (lst_of_cardid, getID(update),)
+                cursor.execute(postgres_update_query, list_to_insert)
+                connection.commit()
+                print("users_questions updated")
                 # Show questions
                 update.message.reply_text('Here are all your questions:')
                 qns_no = 1
@@ -727,10 +732,6 @@ def show_qns(update, context):
                 print("Failed to view qna from the tables", error)
             return CHOOSING
         finally:
-            postgres_index_check_query = """SELECT to_regclass('index');"""
-            cursor.execute(postgres_index_check_query)
-            check = cursor.fetchone()
-            print("Index table existence: " + str(check[0] == "index"))
             # closing database connection.
             if(connection):
                 cursor.close()
@@ -745,64 +746,86 @@ def delete_qns(update, context):
         try:
             connection = connect_db()
             cursor = connection.cursor()
+            # Retrieve card_id from users
+            postgres_copy_check_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            lst = cursor.fetchone()[0]
+            print(lst)
+            # User's response
             text = getText(update)
+            print("User response: " + text)
             result = [x.strip() for x in text.split(',')]
-            list_of_card_id = []
-            for i in result:
-                print("Question(s) to delete: " + str(i))
-                # Retrieve qns_id from index
-                postgres_select_query = """SELECT qns_id FROM index WHERE qns_index = %s"""
-                qns_index_to_insert = (i,)
-                cursor.execute(postgres_select_query, qns_index_to_insert)
-                Card_ID = cursor.fetchone()
-                print("Card ID: " + str(Card_ID))
-                list_of_card_id.insert(len(list_of_card_id), Card_ID)
-            print("List of card ids to delete: " + str(list_of_card_id))
-            for card_id in list_of_card_id:
-                # Delete card
-                postgres_delete_card_query = """DELETE FROM cards WHERE card_id = %s"""
-                cursor.execute(postgres_delete_card_query, card_id)
+            try:
+                # Get list of card_ids
+                list_of_card_id = []
+                for i in result:
+                    list_of_card_id.insert(len(list_of_card_id), lst[int(i) - 1])
+                print("List of card ids to delete: " + str(list_of_card_id))
+                for card_id in list_of_card_id:
+                    print(card_id)
+                    # Delete card
+                    postgres_delete_card_query = """DELETE FROM cards WHERE card_id = %s"""
+                    cursor.execute(postgres_delete_card_query, (card_id,))
+                    connection.commit()
+                    print ("card {} deleted successfully from cards table".format(card_id))
+                    # Delete question
+                    postgres_delete_qns_query = """DELETE FROM questions WHERE card_id = %s"""
+                    cursor.execute(postgres_delete_qns_query, (card_id,))
+                    connection.commit()
+                    print ("question {} deleted successfully from questions table".format(card_id))
+                    # Delete answer
+                    postgres_delete_ans_query = """DELETE FROM answers WHERE card_id = %s"""
+                    cursor.execute(postgres_delete_ans_query, (card_id,))
+                    connection.commit()
+                    print ("answer {} deleted successfully from answers table".format(card_id))
+                update.message.reply_text('{} flashcard(s) has been deleted successfully.'.format(len(list_of_card_id)), reply_markup=markup)
+                lst_of_cardid = []
+                postgres_update_query = """UPDATE users SET users_questions = (%s) WHERE user_id = (%s)"""
+                list_to_insert = (lst_of_cardid, getID(update),)
+                cursor.execute(postgres_update_query, list_to_insert)
                 connection.commit()
-                print ("card {} deleted successfully from cards table".format(card_id))
-                # Delete question
-                postgres_delete_qns_query = """DELETE FROM questions WHERE card_id = %s"""
-                cursor.execute(postgres_delete_qns_query, card_id)
-                connection.commit()
-                print ("question {} deleted successfully from questions table".format(card_id))
-                # Delete answer
-                postgres_delete_ans_query = """DELETE FROM answers WHERE card_id = %s"""
-                cursor.execute(postgres_delete_ans_query, card_id)
-                connection.commit()
-                print ("answer {} deleted successfully from answers table".format(card_id))
-            update.message.reply_text('{} flashcard(s) has been deleted successfully.'.format(len(list_of_card_id)), reply_markup=markup)
-            # Delete index table
-            postgresSQL_delete_query = """DROP TABLE IF EXISTS index"""
-            cursor.execute(postgresSQL_delete_query)
-            connection.commit()
-            print("Table index deleted successfully in PostgreSQL ")
+            except IndexError:
+                update.message.reply_text("Invalid question number! Please try again.")
+                return DELETE_QNS
             return CHOOSING
         except (Exception, psycopg2.Error) as error :
-            postgresSQL_delete_query = """DROP TABLE IF EXISTS index"""
-            cursor.execute(postgresSQL_delete_query)
-            connection.commit()
-            print("Table index deleted successfully in PostgreSQL ")
             if (connection):
                 print("Failed to view qna from the tables", error)
                 return CHOOSING
         finally:
-            postgres_index_check_query = """SELECT to_regclass('index');"""
-            cursor.execute(postgres_index_check_query)
-            check = cursor.fetchone()
             # closing database connection.
             if(connection):
                 cursor.close()
                 connection.close()
-                # print("PostgreSQL connection is closed") 
-            print("Index table existence: " + str(check[0] == "index"))
-            if ((check[0] == 'index') == False):
-                return CHOOSING
 
-# Practice / Test
+# Practice
+def update_questions(update, context, user_id, cards):
+      try:
+            connection = connect_db()
+            cursor = connection.cursor()
+
+            new_cards = []
+            for c in cards:
+                new_cards.append(c)
+
+            postgres_update_query = """ UPDATE users SET users_questions = %s WHERE user_id = %s"""
+            record_to_update = (new_cards, user_id,)
+            cursor.execute(postgres_update_query, record_to_update)
+            connection.commit()
+            count = cursor.rowcount
+            print (count, "Record inserted successfully into users table")
+
+      except (Exception, psycopg2.Error) as error :
+            if(connection):
+                print("Failed to insert record into patient table", error)
+      finally:
+            if(connection):
+                cursor.close()
+                connection.close()
+                #print("PostgreSQL connection is closed")
+
+# Practice
 def practice(update, context):
     if deck_list(update, context) == 0:
         return CHOOSING
@@ -822,6 +845,14 @@ def deck_test(update, context):
             is_check = True
             connection = connect_db()
             cursor = connection.cursor()
+
+            postgres_update_query = """ UPDATE users SET test_done = False WHERE user_id = %s"""
+            record_to_update = (getID(update),)
+            cursor.execute(postgres_update_query, record_to_update)
+            connection.commit()
+            count = cursor.rowcount
+            print (count, "Record inserted successfully into users table")
+
             # Retrieve deck_id from deck_name
             postgres_deck_id_query = """SELECT deck_id FROM decks WHERE deck_name = (%s) AND user_id = (%s)"""
             deck_name_and_id = (getText(update), getID(update),)
@@ -841,26 +872,50 @@ def deck_test(update, context):
                     is_check = False
                     return DECK_TEST
                 print("Deck ID: " + str(list(DECK_ID).pop(0)))
+
+                # Delete record
+                postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
+                record_to_delete = (getID(update),)
+                cursor.execute(postgres_delete_query, record_to_delete)
+                connection.commit()
+
+                postgres_del_query = """DELETE FROM scores WHERE user_id = %s"""
+                record_to_del = (getID(update),)
+                cursor.execute(postgres_del_query, record_to_del)
+                connection.commit()
+
                 # Create a copy of card_id
-                create_copy_table_query = '''CREATE TABLE IF NOT EXISTS copy AS SELECT card_id FROM cards WHERE deck_id = %s'''
+                create_copy_table_query = '''SELECT card_id FROM cards WHERE deck_id = %s'''
                 deck_to_select =  (DECK_ID,)
                 cursor.execute(create_copy_table_query, deck_to_select)
                 connection.commit()
-                print("Table copy created successfully in PostgreSQL ")
+                cards = cursor.fetchall()
+                cards = [i[0] for i in cards]
+
+                print(cards)
+                update_questions(update, context, getID(update), cards)
+
                 ask_qns_practice(update, context, DECK_ID)
                 return PRACTICING
         except (Exception, psycopg2.Error) as error :
             print ("Error while fetching data from PostgreSQL", error)
         finally:
-            postgres_copy_check_query = """SELECT to_regclass('copy');"""
-            cursor.execute(postgres_copy_check_query)
-            check = cursor.fetchone()
+            postgres_copy_check_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            check = len(cursor.fetchone()[0])
+
+            postgres_copy_check_query = """SELECT test_done FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            test = (cursor.fetchone()[0])
             if (connection):
                 cursor.close()
                 connection.close()
                 # print("PostgreSQL connection is closed")
-            print("Copy table existence: " + str(check[0] == "copy"))
-            if ((check[0] == 'copy') == False and is_check):
+            #print("Copy table existence: " + str(check[0] == "copy"))
+            print(test)
+            if ((check == 0) and is_check and test):
                 return CHOOSING 
 
 def ask_qns_practice(update, context, deck_id):
@@ -871,13 +926,18 @@ def ask_qns_practice(update, context, deck_id):
         try:
             connection = connect_db()
             cursor = connection.cursor()
+
             # Check how many remaining questions left
-            postgres_copy_count_query = """SELECT COUNT(*) FROM copy"""
-            cursor.execute(postgres_copy_count_query)
-            remaining = cursor.fetchone()
+            postgres_copy_count_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_count_query, user_id)
+            cards = cursor.fetchone()[0]
+
+            remaining = len(cards)
             # total_qns = remaining[0]
-            update.message.reply_text("Remaining questions: " + str(list(remaining).pop(0)))
-            if list(remaining).pop(0) == 0:
+
+            update.message.reply_text("Remaining questions: " + str(remaining))
+            if ((remaining) == 0):
 
                 # Count score
                 postgres_total_query = """SELECT COUNT(*) FROM scores WHERE user_id = (%s)"""
@@ -897,10 +957,19 @@ def ask_qns_practice(update, context, deck_id):
 
                 update.message.reply_text("You have finished practicing. Good job! 👏")
                 update.message.reply_text("You got {} out of {} questions correct. You skipped {} questions. Try out TEST for a more serious test, without the option to skip!".format(score[0], total_qns[0], skip[0]))
+                
                 postgresSQL_delete_query = """DROP TABLE IF EXISTS copy"""
                 cursor.execute(postgresSQL_delete_query)
                 connection.commit()
                 print("Table copy deleted successfully in PostgreSQL ")
+                
+                postgres_update_query = """ UPDATE users SET test_done = True WHERE user_id = %s"""
+                record_to_update = (user_id,)
+                cursor.execute(postgres_update_query, record_to_update)
+                connection.commit()
+                count = cursor.rowcount
+                print (count, "Record inserted successfully into users table")
+                
                 # Delete record
                 postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
                 record_to_delete = (getID(update),)
@@ -914,13 +983,17 @@ def ask_qns_practice(update, context, deck_id):
 
                 return CHOOSING
             else:
+
                 # Retrive questions from deck
-                postgres_select_card_query = """SELECT card_id FROM copy
-                                                ORDER BY RANDOM()
-                                                LIMIT 1"""
-                deck_to_select =  deck_id
+                postgres_select_card_query = '''SELECT users_questions FROM users WHERE user_id = %s'''
+                deck_to_select =  (getID(update),)
                 cursor.execute(postgres_select_card_query, deck_to_select)
-                card_id = cursor.fetchone()
+                cards = cursor.fetchone()[0]
+
+                rand = random.randint(0, remaining - 1)
+                card_id = cards[rand]
+                card_id = (card_id,)
+
                 print("card_id: " + str(list(card_id).pop(0)))
 
                 # Keep track of scores
@@ -934,7 +1007,6 @@ def ask_qns_practice(update, context, deck_id):
                 record_to_insert = (getID(update), card_id, deck_id,)
                 cursor.execute(postgres_insert_query, record_to_insert)
                 connection.commit()
-
 
                 postgres_text_query = "SELECT is_text FROM questions WHERE qns_id = %s"
                 text_to_select = card_id
@@ -954,8 +1026,11 @@ def ask_qns_practice(update, context, deck_id):
                     update.message.reply_text("What's the answer? Type /skip if you wish to skip the question.")
 
                     # Delete card_id that is already tested from copy 
-                    postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-                    cursor.execute(postgres_delete_query, card_to_select)
+                    #postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                    #cursor.execute(postgres_delete_query, card_to_select)
+                    cards.pop(rand)
+                    update_questions(update, context, getID(update), cards)
+                    print(cards)
 
                 else: 
                     postgreSQL_select_query = "SELECT qns_info FROM questions WHERE qns_id = %s"
@@ -966,8 +1041,12 @@ def ask_qns_practice(update, context, deck_id):
                     update.message.reply_text("What's the answer? Type /skip if you wish to skip the question.")
 
                     # Delete card_id that is already tested from copy 
-                    postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-                    cursor.execute(postgres_delete_query, card_to_select)
+                    #postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                    #cursor.execute(postgres_delete_query, card_to_select)
+                    cards.pop(rand)
+                    update_questions(update, context, getID(update), cards)
+                    print(cards)
+
         except (Exception, psycopg2.Error) as error :
             print ("Error while fetching data from PostgreSQL", error)
         finally:
@@ -1003,81 +1082,104 @@ def practicing(update, context):
             cursor.execute(postgresSQL_delete_query)
             connection.commit()
             print("Table copy deleted successfully in PostgreSQL ")
+            update_questions(context, update, getID(update), [])
+
+            postgres_update_query = """ UPDATE users SET test_done = True WHERE user_id = %s"""
+            record_to_update = (getID(update),)
+            cursor.execute(postgres_update_query, record_to_update)
+            connection.commit()
+            count = cursor.rowcount
+            print (count, "Record inserted successfully into users table")
+
             return CHOOSING
-
-        # Find the deck_id
-        postgres_deck_query = "SELECT deck_id FROM check_ans WHERE user_id = %s"
-        record_to_deck = (getID(update),)
-        cursor.execute(postgres_deck_query, record_to_deck)
-        deck_id = cursor.fetchone()
-
-        # Find correct ans_id
-        postgres_find_query = "SELECT card_id FROM check_ans WHERE user_id = %s"
-        user_id_to_select = (getID(update),)
-        cursor.execute(postgres_find_query, user_id_to_select)
-        card_id = cursor.fetchone()
-
-        postgreSQL_select_query = "SELECT ans_info FROM answers WHERE ans_id = %s"
-        card_to_select = card_id
-        cursor.execute(postgreSQL_select_query, card_to_select)
-        correct_answer = cursor.fetchone()
-        user_answer = (getText(update),)
-        if (user_answer[0].lower() == correct_answer[0].lower()):
-            update.message.reply_text("Correct!")
-
-            # Update score
-            postgres_score_query = """UPDATE scores SET is_correct = (%s) WHERE user_id = (%s) AND qns_count IN(SELECT max(qns_count) FROM scores)"""
-            score_to_insert = (True, getID(update),)
-            cursor.execute(postgres_score_query, score_to_insert)
-            connection.commit()
-
-            # Delete from check_ans
-            postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
-            record_to_delete = (getID(update),)
-            cursor.execute(postgres_delete_query, record_to_delete)
-            connection.commit()
-            # Delete from copy
-            postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-            cursor.execute(postgresSQL_delete_query, card_to_select)
-            connection.commit()
-            ask_qns_practice(update, context, deck_id)
-        elif (getText(update) == "/skip"):
-
-            # Update score
-            postgres_score_query = """UPDATE scores SET is_correct = (%s) WHERE user_id = (%s) AND qns_count IN(SELECT max(qns_count) FROM scores)"""
-            score_to_insert = (False, getID(update),)
-            cursor.execute(postgres_score_query, score_to_insert)
-            connection.commit()
-
-            update.message.reply_text("Question skipped. Try harder next time!")
-            update.message.reply_text("The answer is: {}".format(correct_answer[0]))
-            # Delete from check_ans
-            postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
-            record_to_delete = (getID(update),)
-            cursor.execute(postgres_delete_query, record_to_delete)
-            connection.commit()
-            # Delete from copy
-            postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-            cursor.execute(postgresSQL_delete_query, card_to_select)
-            connection.commit()
-            ask_qns_practice(update, context, deck_id)
         else:
-            update.message.reply_text("Wrong! Try again.")
-            return PRACTICING
+            # Find the deck_id
+            postgres_deck_query = "SELECT deck_id FROM check_ans WHERE user_id = %s"
+            record_to_deck = (getID(update),)
+            cursor.execute(postgres_deck_query, record_to_deck)
+            deck_id = cursor.fetchone()
+
+            # Find correct ans_id
+            postgres_find_query = "SELECT card_id FROM check_ans WHERE user_id = %s"
+            user_id_to_select = (getID(update),)
+            cursor.execute(postgres_find_query, user_id_to_select)
+            card_id = cursor.fetchone()
+
+            postgreSQL_select_query = "SELECT ans_info FROM answers WHERE ans_id = %s"
+            card_to_select = card_id
+            cursor.execute(postgreSQL_select_query, card_to_select)
+            correct_answer = cursor.fetchone()
+            user_answer = (getText(update),)
+            if (user_answer[0].lower() == correct_answer[0].lower()):
+                update.message.reply_text("Correct!")
+
+                # Update score
+                postgres_score_query = """UPDATE scores SET is_correct = (%s) WHERE user_id = (%s) AND qns_count IN(SELECT max(qns_count) FROM scores)"""
+                score_to_insert = (True, getID(update),)
+                cursor.execute(postgres_score_query, score_to_insert)
+                connection.commit()
+
+                # Delete from check_ans
+                postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
+                record_to_delete = (getID(update),)
+                cursor.execute(postgres_delete_query, record_to_delete)
+                connection.commit()
+
+
+                # Delete from copy
+                #postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                #cursor.execute(postgresSQL_delete_query, card_to_select)
+                #connection.commit()
+
+
+                ask_qns_practice(update, context, deck_id)
+            elif (getText(update) == "/skip"):
+
+                # Update score
+                postgres_score_query = """UPDATE scores SET is_correct = (%s) WHERE user_id = (%s) AND qns_count IN(SELECT max(qns_count) FROM scores)"""
+                score_to_insert = (False, getID(update),)
+                cursor.execute(postgres_score_query, score_to_insert)
+                connection.commit()
+
+                update.message.reply_text("Question skipped. Try harder next time!")
+                update.message.reply_text("The answer is: {}".format(correct_answer[0]))
+                # Delete from check_ans
+                postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
+                record_to_delete = (getID(update),)
+                cursor.execute(postgres_delete_query, record_to_delete)
+                connection.commit()
+
+
+                # Delete from copy
+                #postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                #cursor.execute(postgresSQL_delete_query, card_to_select)
+                #connection.commit()
+
+
+                ask_qns_practice(update, context, deck_id)
+            else:
+                update.message.reply_text("Wrong! Try again.")
+                return PRACTICING
     except (Exception, psycopg2.Error) as error :
         print ("Error while fetching data from PostgreSQL", error)
     finally:
-        postgres_copy_check_query = """SELECT to_regclass('copy');"""
-        cursor.execute(postgres_copy_check_query)
-        check = cursor.fetchone()
-        if (connection):
-            cursor.close()
-            connection.close()
-            # print("PostgreSQL connection is closed")
-        print("Copy table existence: " + str(check[0] == "copy"))
-        if ((check[0] == 'copy') == False):
-            return CHOOSING 
+            postgres_copy_check_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            check = len(cursor.fetchone()[0])
+            postgres_copy_check_query = """SELECT test_done FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            test = (cursor.fetchone()[0])
+            if (connection):
+                cursor.close()
+                connection.close()
+                # print("PostgreSQL connection is closed")
+            #print("Copy table existence: " + str(check[0] == "copy"))
+            if ((check == 0) and test):
+                return CHOOSING 
 
+# Test
 def test(update, context):
     if deck_list(update, context) == 0:
         return CHOOSING
@@ -1097,6 +1199,17 @@ def deck_test_test(update, context):
             is_check = True
             connection = connect_db()
             cursor = connection.cursor()
+
+            postgres_update_query = """ UPDATE users SET test_done = False WHERE user_id = %s"""
+            record_to_update = (getID(update),)
+            cursor.execute(postgres_update_query, record_to_update)
+            connection.commit()
+            count = cursor.rowcount
+            print (count, "Record inserted successfully into users table")
+
+
+
+
             # Retrieve deck_id from deck_name
             postgres_deck_id_query = """SELECT deck_id FROM decks WHERE deck_name = (%s) AND user_id = (%s)"""
             deck_name_and_id = (getText(update), getID(update),)
@@ -1116,27 +1229,198 @@ def deck_test_test(update, context):
                     is_check = False
                     return DECK_TEST_TEST
                 print("Deck ID: " + str(list(DECK_ID).pop(0)))
+
+
+                # Delete record
+                postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
+                record_to_delete = (getID(update),)
+                cursor.execute(postgres_delete_query, record_to_delete)
+                connection.commit()
+
+                postgres_del_query = """DELETE FROM scores WHERE user_id = %s"""
+                record_to_del = (getID(update),)
+                cursor.execute(postgres_del_query, record_to_del)
+                connection.commit()
+
                 # Create a copy of card_id
-                create_copy_table_query = '''CREATE TABLE IF NOT EXISTS copy AS SELECT card_id FROM cards WHERE deck_id = %s'''
+                create_copy_table_query = '''SELECT card_id FROM cards WHERE deck_id = %s'''
                 deck_to_select =  (DECK_ID,)
                 cursor.execute(create_copy_table_query, deck_to_select)
                 connection.commit()
-                print("Table copy created successfully in PostgreSQL ")
+                cards = cursor.fetchall()
+                cards = [i[0] for i in cards]
+
+                print(cards)
+                update_questions(update, context, getID(update), cards)
+
                 ask_qns_test(update, context, DECK_ID)
                 return TESTING
+
         except (Exception, psycopg2.Error) as error :
             print ("Error while fetching data from PostgreSQL", error)
         finally:
-            postgres_copy_check_query = """SELECT to_regclass('copy');"""
-            cursor.execute(postgres_copy_check_query)
-            check = cursor.fetchone()
+            postgres_copy_check_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            check = len(cursor.fetchone()[0])
+
+            postgres_copy_check_query = """SELECT test_done FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_check_query, user_id)
+            test = (cursor.fetchone()[0])
+
             if (connection):
                 cursor.close()
                 connection.close()
                 # print("PostgreSQL connection is closed")
-            print("Copy table existence: " + str(check[0] == "copy"))
-            if ((check[0] == 'copy') == False and is_check):
+            #print("Copy table existence: " + str(check[0] == "copy"))
+            if ((check == 0) and is_check and test):
                 return CHOOSING 
+
+def ask_qns_test(update, context, deck_id):
+    if (getText(update) == "/cancel"):
+        cancel(update, context)
+        return CHOOSING
+    else:
+        try:
+            connection = connect_db()
+            cursor = connection.cursor()
+
+
+            # Check how many remaining questions left
+            postgres_copy_count_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+            user_id = (getID(update),)
+            cursor.execute(postgres_copy_count_query, user_id)
+            cards = cursor.fetchone()[0]
+
+            remaining = len(cards)
+            # total_qns = remaining[0]
+
+            update.message.reply_text("Remaining questions: " + str(remaining))
+            if ((remaining) == 0):
+
+                # Count score
+                postgres_total_query = """SELECT COUNT(*) FROM scores WHERE user_id = (%s)"""
+                user_total = (getID(update),)
+                cursor.execute(postgres_total_query, user_total)
+                total_qns = cursor.fetchone()
+
+                postgres_score_query = """SELECT COUNT(*) FROM scores WHERE user_id = (%s) AND is_correct = True"""
+                user_score = (getID(update),)
+                cursor.execute(postgres_score_query, user_score)
+                score = cursor.fetchone()
+
+                update.message.reply_text("You have finished the test. Good job! 👏")
+                update.message.reply_text("You got {} out of {} questions correct. Nice try!".format(score[0], total_qns[0]))
+                update.message.reply_text("Check out STATS to see how accurate you are during testing!")
+                postgresSQL_delete_query = """DROP TABLE IF EXISTS copy"""
+                cursor.execute(postgresSQL_delete_query)
+                connection.commit()
+                print("Table copy deleted successfully in PostgreSQL ")
+
+                postgres_update_query = """ UPDATE users SET test_done = True WHERE user_id = %s"""
+                record_to_update = (user_id,)
+                cursor.execute(postgres_update_query, record_to_update)
+                connection.commit()
+                count = cursor.rowcount
+                print (count, "Record inserted successfully into users table")
+                
+
+                # Delete record
+                postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
+                record_to_delete = (getID(update),)
+                cursor.execute(postgres_delete_query, record_to_delete)
+                connection.commit()
+
+                postgres_del_query = """DELETE FROM scores WHERE user_id = %s"""
+                record_to_del = (getID(update),)
+                cursor.execute(postgres_del_query, record_to_del)
+                connection.commit()
+
+                return CHOOSING
+            else:
+
+                # Retrive questions from deck
+                postgres_select_card_query = '''SELECT users_questions FROM users WHERE user_id = %s'''
+                deck_to_select =  (getID(update),)
+                cursor.execute(postgres_select_card_query, deck_to_select)
+                cards = cursor.fetchone()[0]
+
+                rand = random.randint(0, remaining - 1)
+                card_id = cards[rand]
+                card_id = (card_id,)
+
+                print("card_id: " + str(list(card_id).pop(0)))
+
+
+                # Keep track of scores
+                postgres_score_query = """INSERT INTO scores (user_id, deck_id, qns_count) VALUES (%s, %s, DEFAULT)"""
+                score_to_insert = (getID(update), deck_id,)
+                cursor.execute(postgres_score_query, score_to_insert)
+                connection.commit()
+
+                # Insert card_id that is already tested
+                postgres_insert_query = """INSERT INTO check_ans (user_id, card_id, deck_id) VALUES (%s, %s, %s)"""
+                record_to_insert = (getID(update), card_id, deck_id,)
+                cursor.execute(postgres_insert_query, record_to_insert)
+                connection.commit()
+
+                postgres_text_query = "SELECT is_text FROM questions WHERE qns_id = %s"
+                text_to_select = card_id
+                cursor.execute(postgres_text_query, text_to_select)
+                is_text = cursor.fetchone()[0]
+                print(is_text)
+
+                if (not is_text):
+                    postgreSQL_select_query = "SELECT qns_info FROM questions WHERE qns_id = %s"
+                    card_to_select = card_id
+                    cursor.execute(postgreSQL_select_query, card_to_select)
+                    qns = cursor.fetchone()[0]
+                    update.message.reply_text("Question:\n\n")
+                    chat_id = update.message.chat_id
+                    context.bot.send_photo(chat_id=chat_id, photo = qns)
+                    update.message.reply_text("What's the answer?")
+                    # timer(update, context)
+
+                    postgres_update_query = """UPDATE cards SET num_attempts = num_attempts + 1 WHERE card_id = %s"""
+                    cursor.execute(postgres_update_query, card_to_select)
+                    connection.commit()
+                    print("num_attempts updated successfully")
+
+
+                    # Delete card_id that is already tested from copy 
+                    #postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                    #cursor.execute(postgres_delete_query, card_to_select)
+                    cards.pop(rand)
+                    update_questions(update, context, getID(update), cards)
+                    print(cards)
+
+                else: 
+                    postgreSQL_select_query = """SELECT qns_info FROM questions WHERE qns_id = %s"""
+                    card_to_select = card_id
+                    cursor.execute(postgreSQL_select_query, card_to_select)
+                    qns = cursor.fetchone()
+                    update.message.reply_text("Question:\n\n{}".format(qns[0]))
+                    update.message.reply_text("What's the answer?")
+                    # timer(update, context)
+                    # Update number of attempts
+                    postgres_update_query = """UPDATE cards SET num_attempts = num_attempts + 1 WHERE card_id = %s"""
+                    cursor.execute(postgres_update_query, card_to_select)
+                    connection.commit()
+                    print("num_attempts updated successfully")
+
+                    # Delete card_id that is already tested from copy 
+                    #postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                    #cursor.execute(postgres_delete_query, card_to_select)
+                    cards.pop(rand)
+                    update_questions(update, context, getID(update), cards)
+                    print(cards)
+        except (Exception, psycopg2.Error) as error :
+            print ("Error while fetching data from PostgreSQL", error)
+        finally:
+            if (connection):
+                cursor.close()
+                connection.close()
 
 def testing(update, context):
     try:
@@ -1162,10 +1446,20 @@ def testing(update, context):
             cursor.execute(postgres_delete_query, record_to_delete)
             connection.commit()
             cancel(update, context)
-            postgresSQL_delete_query = """DROP TABLE copy"""
+            postgresSQL_delete_query = """DROP TABLE IF EXISTS copy"""
             cursor.execute(postgresSQL_delete_query)
             connection.commit()
             print("Table copy deleted successfully in PostgreSQL ")
+            update_questions(context, update, getID(update), [])
+
+            postgres_update_query = """ UPDATE users SET test_done = True WHERE user_id = %s"""
+            record_to_update = (getID(update),)
+            cursor.execute(postgres_update_query, record_to_update)
+            connection.commit()
+            count = cursor.rowcount
+            print (count, "Record inserted successfully into users table")
+            
+
             return CHOOSING
         else:
             # Find the deck_id
@@ -1205,9 +1499,9 @@ def testing(update, context):
                 cursor.execute(postgres_delete_query, record_to_delete)
                 connection.commit()
                 # Delete from copy
-                postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-                cursor.execute(postgresSQL_delete_query, card_to_select)
-                connection.commit()
+                #postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                #cursor.execute(postgresSQL_delete_query, card_to_select)
+                #connection.commit()
                 ask_qns_test(update, context, deck_id)
             else:
                 # Update score
@@ -1223,137 +1517,28 @@ def testing(update, context):
                 cursor.execute(postgres_delete_query, record_to_delete)
                 connection.commit()
                 # Delete from copy
-                postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-                cursor.execute(postgresSQL_delete_query, card_to_select)
-                connection.commit()
+                #postgresSQL_delete_query = """DELETE FROM copy WHERE card_id = %s"""
+                #cursor.execute(postgresSQL_delete_query, card_to_select)
+                #connection.commit()
                 ask_qns_test(update, context, deck_id)
     except (Exception, psycopg2.Error) as error :
         print ("Error while fetching data from PostgreSQL", error)
     finally:
-        postgres_copy_check_query = """SELECT to_regclass('copy');"""
-        cursor.execute(postgres_copy_check_query)
-        check = cursor.fetchone()
+        postgres_copy_check_query = """SELECT users_questions FROM users WHERE user_id = %s"""
+        user_id = (getID(update),)
+        cursor.execute(postgres_copy_check_query, user_id)
+        check = len(cursor.fetchone()[0])
+        postgres_copy_check_query = """SELECT test_done FROM users WHERE user_id = %s"""
+        user_id = (getID(update),)
+        cursor.execute(postgres_copy_check_query, user_id)
+        test = (cursor.fetchone()[0])
         if (connection):
             cursor.close()
             connection.close()
             # print("PostgreSQL connection is closed")
-        print("Copy table existence: " + str(check[0] == "copy"))
-        if ((check[0] == 'copy') == False):
+        #print("Copy table existence: " + str(check[0] == "copy"))
+        if ((check == 0) and test):
             return CHOOSING 
-
-def ask_qns_test(update, context, deck_id):
-    if (getText(update) == "/cancel"):
-        cancel(update, context)
-        return CHOOSING
-    else:
-        try:
-            connection = connect_db()
-            cursor = connection.cursor()
-            # Check how many remaining questions left
-            postgres_copy_count_query = """SELECT COUNT(*) FROM copy"""
-            cursor.execute(postgres_copy_count_query)
-            remaining = cursor.fetchone()
-            # total_qns = remaining[0]
-            update.message.reply_text("Remaining questions: " + str(list(remaining).pop(0)))
-            if list(remaining).pop(0) == 0:
-
-                # Count score
-                postgres_total_query = """SELECT COUNT(*) FROM scores WHERE user_id = (%s)"""
-                user_total = (getID(update),)
-                cursor.execute(postgres_total_query, user_total)
-                total_qns = cursor.fetchone()
-
-                postgres_score_query = """SELECT COUNT(*) FROM scores WHERE user_id = (%s) AND is_correct = True"""
-                user_score = (getID(update),)
-                cursor.execute(postgres_score_query, user_score)
-                score = cursor.fetchone()
-
-                update.message.reply_text("You have finished the test. Good job! 👏")
-                update.message.reply_text("You got {} out of {} questions correct. Nice try!".format(score[0], total_qns[0]))
-                postgresSQL_delete_query = """DROP TABLE IF EXISTS copy"""
-                cursor.execute(postgresSQL_delete_query)
-                connection.commit()
-                print("Table copy deleted successfully in PostgreSQL ")
-                # Delete record
-                postgres_delete_query = """DELETE FROM check_ans WHERE user_id = %s"""
-                record_to_delete = (getID(update),)
-                cursor.execute(postgres_delete_query, record_to_delete)
-                connection.commit()
-
-                postgres_del_query = """DELETE FROM scores WHERE user_id = %s"""
-                record_to_del = (getID(update),)
-                cursor.execute(postgres_del_query, record_to_del)
-                connection.commit()
-
-                return CHOOSING
-            else:
-                # Retrive questions from deck
-                postgres_select_card_query = """SELECT card_id FROM copy
-                                                ORDER BY RANDOM()
-                                                LIMIT 1"""
-                deck_to_select =  deck_id
-                cursor.execute(postgres_select_card_query, deck_to_select)
-                card_id = cursor.fetchone()
-                print("Card ID: " + str(list(card_id).pop(0)))
-
-                # Keep track of scores
-                postgres_score_query = """INSERT INTO scores (user_id, deck_id, qns_count) VALUES (%s, %s, DEFAULT)"""
-                score_to_insert = (getID(update), deck_id,)
-                cursor.execute(postgres_score_query, score_to_insert)
-                connection.commit()
-
-                # Insert card_id that is already tested
-                postgres_insert_query = """INSERT INTO check_ans (user_id, card_id, deck_id) VALUES (%s, %s, %s)"""
-                record_to_insert = (getID(update), card_id, deck_id,)
-                cursor.execute(postgres_insert_query, record_to_insert)
-                connection.commit()
-
-                postgres_text_query = "SELECT is_text FROM questions WHERE qns_id = %s"
-                text_to_select = card_id
-                cursor.execute(postgres_text_query, text_to_select)
-                is_text = cursor.fetchone()[0]
-                print(is_text)
-
-                if (not is_text):
-                    postgreSQL_select_query = "SELECT qns_info FROM questions WHERE qns_id = %s"
-                    card_to_select = card_id
-                    cursor.execute(postgreSQL_select_query, card_to_select)
-                    qns = cursor.fetchone()[0]
-                    update.message.reply_text("Question:\n\n")
-                    chat_id = update.message.chat_id
-                    context.bot.send_photo(chat_id=chat_id, photo = qns)
-                    update.message.reply_text("What's the answer?")
-                    # timer(update, context)
-                    postgres_update_query = """UPDATE cards SET num_attempts = num_attempts + 1 WHERE card_id = %s"""
-                    cursor.execute(postgres_update_query, card_to_select)
-                    connection.commit()
-                    print("num_attempts updated successfully")
-                    # Delete card_id that is already tested from copy 
-                    postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-                    cursor.execute(postgres_delete_query, card_to_select)
-                else: 
-                    postgreSQL_select_query = """SELECT qns_info FROM questions WHERE qns_id = %s"""
-                    card_to_select = card_id
-                    cursor.execute(postgreSQL_select_query, card_to_select)
-                    qns = cursor.fetchone()
-                    update.message.reply_text("Question:\n\n{}".format(qns[0]))
-                    update.message.reply_text("What's the answer?")
-                    # timer(update, context)
-                    # Update number of attempts
-                    postgres_update_query = """UPDATE cards SET num_attempts = num_attempts + 1 WHERE card_id = %s"""
-                    cursor.execute(postgres_update_query, card_to_select)
-                    connection.commit()
-                    print("num_attempts updated successfully")
-
-                    # Delete card_id that is already tested from copy 
-                    postgres_delete_query = """DELETE FROM copy WHERE card_id = %s"""
-                    cursor.execute(postgres_delete_query, card_to_select)
-        except (Exception, psycopg2.Error) as error :
-            print ("Error while fetching data from PostgreSQL", error)
-        finally:
-            if (connection):
-                cursor.close()
-                connection.close()
 
 # Statistics
 def stats(update, context):
@@ -1444,7 +1629,7 @@ def deck_stats(update, context):
 # Share decks
 def share(update, context):
     reply_keyboard = [['SHARE', 'RECEIVE']]
-    update.message.reply_text('Are you sharing a deck to someone, or recieving a deck from someone?\n\n'
+    update.message.reply_text('Are you sharing a deck to someone, or receiving a deck from someone?\n\n'
             'Type /cancel to stop this action and choose another option.',
                                 reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return SHARE_OR_RECEIVE
@@ -1465,7 +1650,8 @@ def share_or_receive(update, context):
         'Type /cancel to stop this action and choose another option.')
         return RECEIVE_DECK
     else:
-        return CHOOSING
+        update.message.reply_text("Please only choose SHARE or RECIEVE, or type /cancel to stop this action and choose another option.")
+        return SHARE_OR_RECEIVE
 
 def share_deck(update, context):
     if (getText(update) == "/cancel"):
@@ -1521,14 +1707,12 @@ def receive_deck(update, context):
             old_deck_id = int(getText(update)) - random_no
             print(old_deck_id)
 
-
             # Get deck name
             postgres_card_query = """SELECT deck_name FROM decks WHERE deck_id = (%s)"""
             deck_to_insert = (old_deck_id,)
             cursor.execute(postgres_card_query, deck_to_insert)
             deck_name = cursor.fetchone()
             print(deck_name)
-
 
             # Check if deck_name already existed
             postgres_search_query = """SELECT COUNT(*) FROM decks WHERE deck_name = %s AND user_id = %s"""
@@ -1543,11 +1727,10 @@ def receive_deck(update, context):
                 count = cursor.rowcount
                 print (count, "deck inserted successfully into decks table")
             else:
-                update.message.reply_text("You already have a deck called {}. Unable to recieve this deck. Please rename your existing deck named {}".format(deck_name[0], deck_name[0]), reply_markup = markup)
+                update.message.reply_text("You already have a deck called {}. Unable to receive this deck. Please rename your existing deck named {}".format(deck_name[0], deck_name[0]), reply_markup = markup)
                 return CHOOSING
 
-            update.message.reply_text("Sharing decks... (This might take a while)")
-
+            update.message.reply_text("Receiving deck...")
 
             postgres_new_deck_query = """SELECT deck_id FROM decks WHERE deck_name = %s AND user_id = %s"""
             new_deck = (deck_name, getID(update),)
@@ -1556,53 +1739,62 @@ def receive_deck(update, context):
             print(deck_id)
 
 
+
             create_temp_cards_query = '''SELECT * FROM cards WHERE cards.deck_id = %s'''
             temp_cards_query = (old_deck_id,)
             cursor.execute(create_temp_cards_query, temp_cards_query)
             connection.commit()
-            print("tamp cards created")
+            print("temp cards created")
             cards = cursor.fetchall()
             print(cards)
-
-            for c in cards:
-                postgres_insert_query = """INSERT INTO cards (card_id, deck_id, qns_id, ans_id, num_attempts, num_correct) VALUES (DEFAULT, %s, DEFAULT, DEFAULT, 0, 0)"""
-                card_to_insert = (deck_id,)
-                cursor.execute(postgres_insert_query, card_to_insert)
-                connection.commit()
-                print(c)
-            print("cards table updated")
 
 
             create_temp_qns_query = '''SELECT * from questions INNER JOIN cards ON questions.card_id = cards.card_id WHERE cards.deck_id = %s'''
             temp_qns_query = (old_deck_id,)
             cursor.execute(create_temp_qns_query, temp_qns_query)
             connection.commit()
-            print("tamp qns created")
+            print("temp qns created")
             qns = cursor.fetchall()
             print(qns)
-
-            for q in qns:
-                postgres_insert_query = """INSERT INTO questions (qns_id, card_id, qns_info, is_text) VALUES (DEFAULT, DEFAULT, %s, %s)"""
-                question_to_insert = (q[2], q[3],)
-                cursor.execute(postgres_insert_query, question_to_insert)
-                connection.commit()
-            print("qns table updated")
 
 
             create_temp_ans_query = '''SELECT * from answers INNER JOIN cards ON answers.card_id = cards.card_id WHERE cards.deck_id = %s'''
             temp_ans_query = (old_deck_id,)
             cursor.execute(create_temp_ans_query, temp_ans_query)
             connection.commit()
-            print("tamp ans created")
+            print("temp ans created")
             ans = cursor.fetchall()
             print(ans)
 
-            for a in ans:
-                postgres_insert_query = """INSERT INTO answers (ans_id, card_id, ans_info) VALUES (DEFAULT, DEFAULT, %s)"""
-                answer_to_insert = (a[2],)
+            i = 0
+
+            for c in cards:
+
+                postgres_insert_query = """INSERT INTO cards (card_id, deck_id, qns_id, ans_id, num_attempts, num_correct) VALUES (DEFAULT, %s, DEFAULT, DEFAULT, 0, 0)"""
+                card_to_insert = (deck_id,)
+                cursor.execute(postgres_insert_query, card_to_insert)
+                connection.commit()
+                print(c)
+ 
+                postgres_score_query = """SELECT max(card_id) FROM cards INNER JOIN decks ON cards.deck_id = decks.deck_id WHERE decks.user_id = %s"""
+                score_to_insert = (getID(update),)
+                cursor.execute(postgres_score_query, score_to_insert)
+                card_id = cursor.fetchone()
+                print(card_id)
+
+                postgres_insert_query = """INSERT INTO questions (qns_id, card_id, qns_info, is_text) VALUES (%s, %s, %s, %s)"""
+                question_to_insert = (card_id, card_id, qns[i][2], qns[i][3],)
+                cursor.execute(postgres_insert_query, question_to_insert)
+                connection.commit()
+
+                postgres_insert_query = """INSERT INTO answers (ans_id, card_id, ans_info) VALUES (%s, %s, %s)"""
+                answer_to_insert = (card_id, card_id, ans[i][2],)
                 cursor.execute(postgres_insert_query, answer_to_insert)
                 connection.commit()
-            print("ans table updated")
+
+                i = i + 1
+
+            print("all tables updated")
 
 
 
@@ -1682,7 +1874,6 @@ def rename_deck(update, context):
             CHECK = cursor.fetchone()
             if CHECK[0] == 0:
 
-
                 # Retrieve deck_id from deck_name
                 postgres_deck_id_query = """SELECT deck_id FROM decks WHERE deck_name = %s AND user_id = (%s)"""
                 deck_name_and_id = ("HOPEFULLYNOBODYUSESTHISDECKNAMEIDK", getID(update),)
@@ -1690,7 +1881,6 @@ def rename_deck(update, context):
                 DECK_ID = cursor.fetchone()
                 print("deck to change found")
                 print(DECK_ID[0])
-
 
                 # Delete deck
                 postgres_delete_deck_query = """UPDATE decks SET deck_name = (%s) WHERE deck_id = (%s)"""
@@ -1732,15 +1922,15 @@ def help(update, context):
     helpMessage += "DELETE ⛔ - delete decks or individual flashcards\n"
     helpMessage += "PRACTICE 💪 - practice with selected deck (unlimited tries and /skip command)\n"
     helpMessage += "TEST ✍ - test yourself with selected deck (only 1 try per question)\n"
-    helpMessage += "STATS 📊 - view accuracy statistics of questions in a selected deck\n"
+    helpMessage += "STATS 📊 - view accuracy statistics of questions in a selected deck during TEST\n"
     helpMessage += "NEXT ➡️ - go to next page of keyboard buttons\n\n"
 
     helpMessage += "Second page:\n"
-    helpMessage += "SHARE 📩 - share your created decks or recieve shared decks from others\n"
+    helpMessage += "SHARE 📩 - share your created decks or receive shared decks from others\n"
     helpMessage += "RENAME ✏️ - rename a selected deck\n"
-    helpMessage += "SET TIMER ⏱️ - set or unset a timer\n"
+    helpMessage += "SET TIMER ⏱️ - set or unset a timer of your own duration\n"
     helpMessage += "MOTIVATIONAL QUOTES 😉 - get a random motivational quote\n"
-    helpMessage += "DAILY REMINDER 🔔 - set a daily reminder for yourself at a selected time\n"
+    helpMessage += "DAILY REMINDER 🔔 - set a daily reminder for yourself at the time this button is used\n"
     helpMessage += "POMODORO TIMER 🍅 - productivity timer to to help you focus on work (25 mins)\n"
     helpMessage += "BACK ⬅️ - go to previous page of keyboard buttons\n"
     helpMessage += "RESTART BOT 🆘 - restart the bot\n\n"
@@ -1775,7 +1965,14 @@ def done(update, context):
         postgresSQL_delete_query = """DROP TABLE IF EXISTS index """
         cursor.execute(postgresSQL_delete_query)
         connection.commit()
+        update_questions(context, update, getID(update), [])
         print("Table copy deleted successfully in PostgreSQL ")
+        postgres_update_query = """ UPDATE users SET test_done = True WHERE user_id = %s"""
+        record_to_update = (getID(update),)
+        cursor.execute(postgres_update_query, record_to_update)
+        connection.commit()
+        count = cursor.rowcount
+        print (count, "Record inserted successfully into users table")
 
     except (Exception, psycopg2.Error) as error :
         print ("Error while fetching data from PostgreSQL", error)
@@ -1797,8 +1994,9 @@ def quotes(update, context):
 
 # Reminders
 def daily_reminder(update, context):
+    update.message.reply_text("The best way to learn is to practice every day!")
     reply_keyboard = [['SET', 'UNSET']]
-    update.message.reply_text('Are you setting or unsetting daily reminder?\n\n'
+    update.message.reply_text('Are you setting or unsetting a daily reminder?\n\n'
                                 'Type /cancel to stop this action and choose another option.',
                                 reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return SET_OR_UNSET
@@ -1809,10 +2007,13 @@ def set_or_unset(update, context):
         return CHOOSING
     elif getText(update).lower() == "set":
         setreminder(update, context)
+        return CHOOSING
     elif getText(update).lower() == "unset":
         stopreminder(update, context)
-    else:
         return CHOOSING
+    else:
+        update.message.reply_text("Please choose SET or UNSET, o type /cancel to stop this action and choose another option.")
+        return SET_OR_UNSET
 
 def callback_alarm(context: CallbackContext):
     context.bot.send_message(chat_id=context.job.context, text='Remember to practice your flashcards!')
@@ -1828,7 +2029,6 @@ def setreminder(update, context: CallbackContext):
     context.job_queue.enabled = True 
     context.job_queue.start()
     context.job_queue.run_repeating(callback_alarm, context=update.message.chat_id, interval=86400, first=0)
-    return CHOOSING
 
 def stopreminder(update, context: CallbackContext):
     #if (not context.job_queue.enabled):
@@ -1841,7 +2041,6 @@ def stopreminder(update, context: CallbackContext):
                             reply_markup = markup)
     context.job_queue.enabled = False 
     context.job_queue.stop()
-    return CHOOSING
 
 # Menu Keyboard
 def next(update, context):
@@ -1856,7 +2055,7 @@ def back(update, context):
 def pomodoro_timer(update, context):
     reply_keyboard = [['START']]
     update.message.reply_text('Want to be more productive? Click START and focus on your tasks while the time is not up!\n\n'
-                            'Type /cancel to stop this action and choose another option.',
+                            'Note that this is no pauses pomodoro_timer. If you do not wish to go ahead, type /cancel to stop this action and choose another option.',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return START_POMODORO
 
@@ -1872,22 +2071,36 @@ def start_pomodoro(update, context):
         chat_id = update.message.chat_id
         duration = 25 * 60
         time_left = duration
-        update.message.reply_text('25 minutes starts now!')
+        new_job = context.job_queue.run_once(alarm, duration, context=chat_id)
+        print(new_job)
+        print(new_job)
+        inline_keyboard = [[InlineKeyboardButton("Time left?", callback_data=time_left)]]
+        inline_reply_markup = InlineKeyboardMarkup(inline_keyboard)
+        update.message.reply_text('25 minutes starts now!', reply_markup=inline_reply_markup)
         for i in range(duration):
+            print(i)
             time.sleep(1)
-            time_left = time_left - i
         reply_keyboard_2 = [['SHORT BREAK', 'LONG BREAK']]
         update.message.reply_text('Time to take a rest!\nDo you want to take a short break (5 mins) or a long break(15 mins)?',
             reply_markup=ReplyKeyboardMarkup(reply_keyboard_2, one_time_keyboard=True))
         return REST_POMODORO
+    else:
+        return CHOOSING  
+
+def button(update, context):
+    query = update.callback_query
+    context.bot.answer_callback_query(query.id, text='Time left: {} minutes'.format(query.data), show_alert = True)
+    query.answer()
 
 def start_again_pomodoro(update, context):
     chat_id = update.message.chat_id
     duration = 25 * 60
     new_job = context.job_queue.run_once(alarm, duration, context=chat_id)
+    print(new_job)
     update.message.reply_text('25 minutes starts now!')
     for i in range(duration):
         time.sleep(1)
+        print(i)
     reply_keyboard = [['SHORT BREAK', 'LONG BREAK']]
     update.message.reply_text('Time to take a rest!\nDo you want to take a short break (5 mins) or a long break(15 mins)?',
     reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -1901,8 +2114,10 @@ def rest_pomodoro(update, context):
         chat_id = update.message.chat_id
         duration = 5 * 60 
         new_job = context.job_queue.run_once(alarm, duration, context=chat_id)
+        print(new_job)
         update.message.reply_text('5 minutes starts now!')
         for i in range(duration):
+            print(i)
             time.sleep(1)
         update.message.reply_text('Rest time is up!')
         reply_keyboard = [['START AGAIN', 'QUIT']]
@@ -1921,6 +2136,8 @@ def rest_pomodoro(update, context):
         update.message.reply_text('Do you want to start the pomodoro timer again or quit?',
             reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
         return START_OR_QUIT
+    else:
+        return CHOOSING
 
 def start_or_quit(update, context):
     if (getText(update) == "/cancel"):
@@ -1931,16 +2148,18 @@ def start_or_quit(update, context):
     elif getText(update).lower() == "quit":
         update.message.reply_text("Alright, let\'s stop. Keep up the good work!",reply_markup = markup)
         return CHOOSING
+    else:
+        return CHOOSING
 
 # Timer
 def timer(update, context):
-    update.message.reply_text("How long do you want your timer to be? (in minutes)\nClick /cancel if you do not want to start a timer. ")
+    update.message.reply_text("How long do you want your timer to be? (in minutes)\n\nType /cancel to stop this action and choose another option.")
     return CHOOSE_TIME
 
-def alarm(context):
+def timer_alarm(context):
     """Send the alarm message."""
     job = context.job
-    context.bot.send_message(job.context, text='Your time is up!')
+    context.bot.send_message(job.context, text='BEEP! The timer has ended, your time is up!')
 
 def set_timer(update, context):
     if (getText(update) == "/cancel"):
@@ -1952,13 +2171,13 @@ def set_timer(update, context):
             duration = int(getText(update))
             due = duration * 60
             print(due)
-            if due < 0:
+            if due < 0 or (not is_int(due)):
                 update.message.reply_text('Invalid value! Try again.')
                 return CHOOSE_TIME
             if 'job' in context.chat_data:
                 old_job = context.chat_data['job']
                 old_job.schedule_removal()
-            new_job = context.job_queue.run_once(alarm, due, context=chat_id)
+            new_job = context.job_queue.run_once(timer_alarm, due, context=chat_id)
             context.chat_data['job'] = new_job
             update.message.reply_text('Timer set successfully!')
             update.message.reply_text("Duration of timer: {} minutes".format(duration))
@@ -1966,19 +2185,17 @@ def set_timer(update, context):
         except (IndexError, ValueError):
             update.message.reply_text('Usage: <Integer greater than 0>')
             return CHOOSING
-            
 
 def unset(update, context):
     """Remove the job if the user changed their mind."""
     if 'job' not in context.chat_data:
-        update.message.reply_text('You have no active timer')
+        update.message.reply_text('You have no active timer.')
         return
-
     job = context.chat_data['job']
     job.schedule_removal()
     del context.chat_data['job']
-
     update.message.reply_text('Timer successfully unset!')
+    return CHOOSING
 
 # Log Errors caused by Updates.
 def error(update, context):
@@ -1988,6 +2205,7 @@ def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CallbackQueryHandler(button))
     conv_handler_normal = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -2072,6 +2290,7 @@ def main():
     )
     dp.add_handler(conv_handler_normal)
     dp.add_error_handler(error)
+    # updater.start_polling()
     updater.start_webhook(listen="0.0.0.0",
                           port=int(PORT),
                           url_path=TOKEN)

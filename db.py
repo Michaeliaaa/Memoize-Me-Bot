@@ -8,7 +8,6 @@ try:
                                   host = "ec2-35-171-31-33.compute-1.amazonaws.com",
                                   port = "5432",
                                   database = "dfhns0og19dacd")
-                                  
     cursor = connection.cursor()
     
     q = """DROP TABLE users"""
@@ -40,9 +39,10 @@ try:
     connection.commit()
     print("Tables deleted successfully in PostgreSQL ")
 
-
     create_users_table_query = '''CREATE TABLE IF NOT EXISTS users
-          (user_id INT PRIMARY KEY); '''
+          (user_id INT PRIMARY KEY,
+          users_questions INTEGER[],
+          test_done BOOLEAN); '''
     cursor.execute(create_users_table_query)
     connection.commit()
     print("Table users created successfully in PostgreSQL ")
@@ -71,8 +71,8 @@ try:
 
 
     create_questions_table_query = '''CREATE TABLE IF NOT EXISTS questions
-          (qns_id SERIAL PRIMARY KEY,
-          card_id SERIAL,
+          (qns_id INT PRIMARY KEY,
+          card_id INT,
           qns_info  TEXT,
           is_text BOOLEAN)'''
           #FOREIGN KEY (card_id) REFERENCES cards (card_id)); '''
@@ -82,8 +82,8 @@ try:
 
 
     create_answers_table_query = '''CREATE TABLE IF NOT EXISTS answers
-          (ans_id SERIAL PRIMARY KEY,
-          card_id SERIAL,
+          (ans_id INT PRIMARY KEY,
+          card_id INT,
           ans_info  TEXT);'''
           #FOREIGN KEY (card_id) REFERENCES cards (card_id)); '''
     cursor.execute(create_answers_table_query)

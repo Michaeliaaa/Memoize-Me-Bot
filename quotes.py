@@ -1,6 +1,3 @@
-"""Credits to dkhd from https://github.com/dkhd/quotebot"""
-"""For school's project"""
-
 from random import randint
 
 quotes_file = "quotes.txt"
