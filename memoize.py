@@ -1595,6 +1595,8 @@ def deck_stats(update, context):
             def grading(percentage):
                 if percentage is None:
                     update.message.reply_text("Start testing yourself with this new question!")
+                elif percentage == 0:
+                    update.message.reply_text("You need to work hard for this question. Keep trying!")
                 elif percentage < 70:
                     update.message.reply_text("You can do better for this question. Aim for at least 70%!")
                 elif percentage == 100:
@@ -1986,10 +1988,10 @@ def done(update, context):
 
 # Generate a random quote
 def quotes(update, context):
-    arr = ["Keep up the good work!", "You got this!", "You're doing great!", "You can do it!"]
+    arr = ["keep up the good work!", "you got this!", "you're doing great!", "you can do it!"]
     rand = random.randint(0,3)
     update.message.reply_text(get_random_quote())
-    update.message.reply_text(arr[rand])
+    update.message.reply_text('{}, '.format(update.message.from_user.first_name) + str(arr[rand]))
     return CHOOSING
 
 # Reminders
@@ -2054,8 +2056,8 @@ def back(update, context):
 # Pomodoro Timer
 def pomodoro_timer(update, context):
     reply_keyboard = [['START']]
-    update.message.reply_text('Want to be more productive? Click START and focus on your tasks while the time is not up!\n\n'
-                            'Note that this is no pauses pomodoro_timer. If you do not wish to go ahead, type /cancel to stop this action and choose another option.',
+    update.message.reply_text('Want to be more productive for the next 30 minutes? Click START and focus on your tasks while the time is not up!\n\n'
+                            'Note that you cannot pause this pomodoro timer. If you do not wish to go ahead, click /cancel to stop this action and choose another option.',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return START_POMODORO
 
@@ -2074,9 +2076,7 @@ def start_pomodoro(update, context):
         new_job = context.job_queue.run_once(alarm, duration, context=chat_id)
         print(new_job)
         print(new_job)
-        inline_keyboard = [[InlineKeyboardButton("Time left?", callback_data=time_left)]]
-        inline_reply_markup = InlineKeyboardMarkup(inline_keyboard)
-        update.message.reply_text('25 minutes starts now!', reply_markup=inline_reply_markup)
+        update.message.reply_text('25 minutes starts now!')
         for i in range(duration):
             print(i)
             time.sleep(1)
@@ -2086,11 +2086,6 @@ def start_pomodoro(update, context):
         return REST_POMODORO
     else:
         return CHOOSING  
-
-def button(update, context):
-    query = update.callback_query
-    context.bot.answer_callback_query(query.id, text='Time left: {} minutes'.format(query.data), show_alert = True)
-    query.answer()
 
 def start_again_pomodoro(update, context):
     chat_id = update.message.chat_id
@@ -2114,7 +2109,6 @@ def rest_pomodoro(update, context):
         chat_id = update.message.chat_id
         duration = 5 * 60 
         new_job = context.job_queue.run_once(alarm, duration, context=chat_id)
-        print(new_job)
         update.message.reply_text('5 minutes starts now!')
         for i in range(duration):
             print(i)
@@ -2128,8 +2122,9 @@ def rest_pomodoro(update, context):
         chat_id = update.message.chat_id
         duration = 15 * 60 
         new_job = context.job_queue.run_once(alarm, duration, context=chat_id)
-        update.message.reply_text('5 minutes starts now!')
+        update.message.reply_text('15 minutes starts now!')
         for i in range(duration):
+            print(i)
             time.sleep(1)
         update.message.reply_text('Rest time is up!')
         reply_keyboard = [['START AGAIN', 'QUIT']]
@@ -2205,7 +2200,6 @@ def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("help", help))
-    dp.add_handler(CallbackQueryHandler(button))
     conv_handler_normal = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
