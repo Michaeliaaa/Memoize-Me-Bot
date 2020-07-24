@@ -1940,7 +1940,7 @@ def help(update, context):
     helpMessage += "Additional commands:\n"
     helpMessage += "/help - view all commands and what they do\n"
     
-    update.message.reply_text(helpMessage)
+    update.message.reply_text(helpMessage, reply_markup=markup)
     return CHOOSING
 
 # Retrieve user_id
