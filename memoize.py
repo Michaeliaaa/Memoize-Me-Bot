@@ -80,7 +80,7 @@ def new(update, context):
     update.message.reply_text(
         '\nLet\'s create a new deck of flashcards!\n\n'
         'Type /cancel to stop this action and choose another option.\n\n')
-    update.message.reply_text('Please give your new deck a name.')
+    update.message.reply_text('Please give your new deck a name.', reply_markup=markup)
     return CREATE_DECK
 
 def create_deck(update, context):
@@ -218,7 +218,7 @@ def view_qna(update, context):
                         # update.message.reply_text("🔽")
                     else:
                         update.message.reply_text("Answer: " + i)
-            update.message.reply_text("That's all you have in this deck!")
+            update.message.reply_text("That's all you have in this deck!", reply_markup=markup)
         except (Exception, psycopg2.Error) as error :
             if (connection):
                 print("Failed to view qna from the tables", error)
@@ -551,7 +551,7 @@ def insert_more_cards(update, context, deck_id):
             count = cursor.rowcount
             
             postgres_score_query = """INSERT INTO scores (user_id, deck_id, qns_count) VALUES (%s, %s, DEFAULT)"""
-            score_to_insert = (getID(update), deck_id,)
+            score_to_insert = (getID(update), deck_id,)/Users/mich.aelia/Desktop/BOT/memoize.py
             cursor.execute(postgres_score_query, score_to_insert)
             connection.commit()
 
@@ -1939,8 +1939,16 @@ def help(update, context):
 
     helpMessage += "Additional commands:\n"
     helpMessage += "/help - view all commands and what they do\n"
+    helpMessage += "/done - restart your bot in case your bot is not responding\n"
+
+    emergency = "🚨 If the bot is not responding, follow these steps:\n"
+    emergency += "1) Click /done\n"
+    emergency += "2) Click /start\n"
+    emergency += "Voila, now you can start using the bot!"
     
     update.message.reply_text(helpMessage, reply_markup=markup)
+    update.message.reply_text(emergency)
+
     return CHOOSING
 
 # Retrieve user_id
